@@ -3,6 +3,24 @@ export type StudioStage = 'record' | 'crop' | 'emotion' | 'cover' | 'collection'
 export interface CropRange { start: number; end: number }
 export interface AudioFeatures { loudness: number; dynamics: number; pitch: number; zeroCrossing: number; pauseRatio: number; tempoVariation: number }
 export interface EmotionResult { label: EmotionLabel; confidence: number; explanation: string; scores: Record<EmotionLabel, number> }
+/** 声音获取方式：麦克风录音或导入本地文件 */
+export type AudioMethod = 'recording' | 'import';
+/**
+ * 分析依据来源。只有明确经历过的流程才会记录：
+ * - original：新建作品时的首段声音
+ * - replacement：编辑已保存作品时确认替换的声音
+ * 字段缺省（旧作品）一律视为来源未知，展示层不得猜测。
+ */
+export type FeatureSource =
+  | { kind: 'original'; method: AudioMethod; at: string }
+  | { kind: 'replacement'; method: AudioMethod; at: string; basedOnLabel: EmotionLabel };
+export function describeFeatureSource(source: FeatureSource | undefined): string {
+  if (!source) return '来源未知';
+  const method = source.method === 'recording' ? '录音' : '导入文件';
+  return source.kind === 'replacement'
+    ? `声音替换 · ${method}（原标签「${source.basedOnLabel}」）`
+    : `原始${method}`;
+}
 export interface CoverConfig {
   label: EmotionLabel;
   title: string;
@@ -19,6 +37,8 @@ export interface VoiceMeme {
   emotion: EmotionLabel;
   confidence: number;
   features: AudioFeatures;
+  /** 当前 features 的来源；旧作品可能缺省，展示层按来源未知处理，禁止猜测 */
+  featureSource?: FeatureSource;
   audio: Blob;
   duration: number;
   cover: Blob;
