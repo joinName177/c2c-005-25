@@ -1,5 +1,6 @@
 export type EmotionLabel = '暴躁老哥' | '温柔姐姐' | '阴阳怪气' | '元气满满';
 export type StudioStage = 'record' | 'crop' | 'emotion' | 'cover' | 'collection';
+export type LabelSource = 'analysis' | 'manual' | 'inherited';
 export interface CropRange { start: number; end: number }
 export interface AudioFeatures { loudness: number; dynamics: number; pitch: number; zeroCrossing: number; pauseRatio: number; tempoVariation: number }
 export interface EmotionResult { label: EmotionLabel; confidence: number; explanation: string; scores: Record<EmotionLabel, number> }
@@ -24,6 +25,14 @@ export interface VoiceMeme {
   cover: Blob;
   coverConfig: CoverConfig;
   createdAt: string;
+  labelSource?: LabelSource;
+}
+
+export function labelSourceText(source?: LabelSource): string {
+  if (source === 'analysis') return '声音分析';
+  if (source === 'manual') return '手动选择';
+  if (source === 'inherited') return '沿用原标签';
+  return '未知';
 }
 
 export function validateCropRange(range: CropRange, duration: number): string | undefined {

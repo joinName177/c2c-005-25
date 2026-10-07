@@ -1,11 +1,12 @@
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
 import App from '../App.vue';
+import CoverWorkshop from '../components/CoverWorkshop.vue';
 import type { StudioDependencies } from '../useStudio';
 import type { VoiceMeme } from '../../core/models';
 
-function deps(options: { denied?: boolean } = {}): StudioDependencies {
-  const works: VoiceMeme[] = [];
+function deps(options: { denied?: boolean; works?: VoiceMeme[] } = {}): StudioDependencies {
+  const works: VoiceMeme[] = options.works ?? [];
   return {
     recorder:{isRecording:false,start:async()=>{if(options.denied)throw new DOMException('denied','NotAllowedError')},stop:async()=>new Blob(['voice'],{type:'audio/webm'})},
     analyzer:{analyze:async()=>({duration:2,features:{loudness:.75,dynamics:.55,pitch:.8,zeroCrossing:.62,pauseRatio:.12,tempoVariation:.6}})},
@@ -32,5 +33,29 @@ describe('Voice meme App', () => {
     await wrapper.get('[data-testid="analyze"]').trigger('click'); await Promise.resolve(); await wrapper.get('[data-emotion="温柔姐姐"]').trigger('click'); expect(wrapper.text()).toContain('已手动选择');
     await wrapper.get('[data-testid="to-cover"]').trigger('click'); await wrapper.get('[aria-label="气泡文字"]').setValue('轻轻说一句'); await wrapper.get('[data-testid="save-work"]').trigger('click'); await Promise.resolve(); await Promise.resolve();
     expect(wrapper.text()).toContain('作品集'); expect(wrapper.text()).toContain('我的声音表情');
+  });
+  it('replaces the voice of a saved work only after confirmation and keeps title and bubble', async () => {
+    const wrapper=mount(App,{props:{dependencies:deps()}}); await wrapper.get('[data-testid="record"]').trigger('click'); await wrapper.get('[data-testid="stop"]').trigger('click'); await Promise.resolve();
+    await wrapper.get('[data-testid="analyze"]').trigger('click'); await Promise.resolve(); await wrapper.get('[data-testid="to-cover"]').trigger('click');
+    await wrapper.get('[aria-label="气泡文字"]').setValue('手写气泡'); await wrapper.get('[data-testid="save-work"]').trigger('click'); await flushPromises();
+    expect(wrapper.find('[data-testid="replace-file"]').exists()).toBe(false);
+    await wrapper.get('article.work-card footer button').trigger('click');
+    expect(wrapper.find('[data-testid="replace-file"]').exists()).toBe(true);
+    wrapper.findComponent(CoverWorkshop).vm.$emit('replace',new Blob(['new-voice'])); await flushPromises();
+    expect(wrapper.text()).toContain('原作名称与手写气泡会保留');
+    await wrapper.get('[data-testid="replace-analyze"]').trigger('click'); await flushPromises();
+    await wrapper.get('[data-testid="confirm-accept"]').trigger('click'); await flushPromises();
+    expect((wrapper.get('[aria-label="气泡文字"]').element as HTMLTextAreaElement).value).toBe('手写气泡');
+    await wrapper.get('[data-testid="save-work"]').trigger('click'); await flushPromises();
+    expect(wrapper.text()).toContain('标签来源：声音分析');
+  });
+  it('cancel keeps the original voice of a saved work', async () => {
+    const wrapper=mount(App,{props:{dependencies:deps()}}); await wrapper.get('[data-testid="record"]').trigger('click'); await wrapper.get('[data-testid="stop"]').trigger('click'); await Promise.resolve();
+    await wrapper.get('[data-testid="analyze"]').trigger('click'); await Promise.resolve(); await wrapper.get('[data-testid="to-cover"]').trigger('click');
+    await wrapper.get('[data-testid="save-work"]').trigger('click'); await flushPromises();
+    await wrapper.get('article.work-card footer button').trigger('click');
+    wrapper.findComponent(CoverWorkshop).vm.$emit('replace',new Blob(['new-voice'])); await flushPromises();
+    await wrapper.get('[data-testid="cancel-replace"]').trigger('click'); await flushPromises();
+    expect(wrapper.text()).toContain('已取消替换'); expect(wrapper.find('[data-testid="save-work"]').exists()).toBe(true);
   });
 });
